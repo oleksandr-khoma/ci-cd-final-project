@@ -1,0 +1,90 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: lab-pipeline
+spec:
+  workspaces:
+    - name: output
+  params:
+    - name: repo-url
+      type: string
+      description: "The URL of the repository to clone. MUST be your Node.js repo, not the default Python one."
+      default: "https://github.com/ibm-developer-skills-network/wtecc-CICD_PracticeCode"
+    - name: branch
+      type: string
+      default: "main"
+    - name: build-image
+      type: string
+    - name: app-name
+      type: string
+      default: "my-app"
+  tasks:
+    # 1. Cleanup
+    - name: cleanup
+      taskRef:
+        name: cleanup
+      workspaces:
+        - name: source
+          workspace: output
+
+    # 2. Git Clone
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      runAfter:
+        - cleanup
+      params:
+        - name: url
+          value: "$(params.repo-url)"
+        - name: revision
+          value: "$(params.branch)"
+      workspaces:
+        - name: output
+          workspace: output
+
+    # 3. Lint
+    - name: lint
+      taskRef:
+        name: eslint
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: output
+
+    # 4. Tests
+    - name: tests
+      taskRef:
+        name: jest-test
+      runAfter:
+        - lint
+      workspaces:
+        - name: source
+          workspace: output
+
+    # 5. Build Image
+    - name: build-image
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      runAfter:
+        - tests
+      params:
+        - name: IMAGE
+          value: "$(params.build-image)"
+      workspaces:
+        - name: source
+          workspace: output
+
+    # 6. Deploy
+    - name: deploy
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      runAfter:
+        - build-image
+      params:
+        - name: SCRIPT
+          value: |
+            oc create deployment $(params.app-name) --image=$(params.build-image) --dry-run=client -o yaml | oc apply -f -
