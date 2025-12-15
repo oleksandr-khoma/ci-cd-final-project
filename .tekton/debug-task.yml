@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: debug-workspace
+spec:
+  workspaces:
+    - name: output
+  steps:
+    - name: debug
+      image: alpine:3
+      workingDir: $(workspaces.output.path)
+      script: |
+        #!/bin/sh
+        echo "=========================================="
+        echo "DEBUG: Workspace Contents After Git Clone"
+        echo "=========================================="
+        echo "Current directory: $(pwd)"
+        echo "Workspace path: $(workspaces.output.path)"
+        echo ""
+        echo "Directory listing:"
+        ls -laR
+        echo ""
+        echo "Disk usage:"
+        du -sh $(workspaces.output.path)
+        echo "=========================================="
+
