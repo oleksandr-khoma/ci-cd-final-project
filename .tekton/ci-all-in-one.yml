@@ -2,7 +2,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: ci-all-in-one
+  name: ci-build-all-in-one
 spec:
   params:
     - name: repo-url
@@ -12,6 +12,9 @@ spec:
       type: string
       description: Git revision (branch/tag/commit)
       default: "main"
+    - name: image
+      type: string
+      description: Container image to build
   workspaces:
     - name: source
   steps:
@@ -78,5 +81,48 @@ spec:
         npm test
         
         echo "✅ Tests passed!"
+        echo ""
+
+    # Step 4: Build Image
+    - name: build-and-push
+      image: quay.io/buildah/stable:v1.27.0
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        privileged: true
+      script: |
+        #!/usr/bin/env bash
+        set -e
+        
+        echo "=========================================="
+        echo "Step 4: Building Container Image"
+        echo "=========================================="
+        echo "Image: $(params.image)"
+        echo "Context: $(pwd)"
+        echo ""
+        
+        # Check if Dockerfile exists
+        if [ ! -f "Dockerfile" ]; then
+          echo "❌ ERROR: Dockerfile not found!"
+          echo "Directory contents:"
+          ls -la
+          exit 1
+        fi
+        
+        echo "✅ Dockerfile found"
+        echo ""
+        
+        # Build the image
+        echo "Building image..."
+        buildah bud --format=docker --tls-verify=false -t $(params.image) .
+        
+        echo ""
+        echo "✅ Image built successfully"
+        echo ""
+        
+        # Push the image
+        echo "Pushing image to registry..."
+        buildah push --tls-verify=false $(params.image)
+        
+        echo "✅ Image pushed successfully"
         echo ""
 

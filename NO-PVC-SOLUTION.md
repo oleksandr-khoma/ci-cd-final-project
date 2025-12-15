@@ -21,12 +21,12 @@ I've created a **working solution** that combines clone, lint, and test into ONE
 
 ```
 Pipeline: lab-pipeline-no-pvc
-  ├─ Task 1: ci (ONE pod with 3 steps)
+  ├─ Task 1: ci-and-build (ONE pod with 4 steps)
   │   ├─ Step 1: git-clone
   │   ├─ Step 2: eslint
-  │   └─ Step 3: jest-test
-  ├─ Task 2: build-image (buildah)
-  └─ Task 3: deploy (openshift-client)
+  │   ├─ Step 3: jest-test
+  │   └─ Step 4: build-and-push (buildah)
+  └─ Task 2: deploy (openshift-client)
 ```
 
 ## Why This Works
@@ -39,10 +39,11 @@ Task 2 (lint)  → Pod B → NEW EMPTY workspace → FAIL ❌
 
 **Solution with all-in-one:**
 ```
-Task 1 (ci):
+Task 1 (ci-and-build):
   Step 1 (clone) → Files created in Pod A
   Step 2 (lint)  → Reads files from Pod A (same pod!) ✅
   Step 3 (test)  → Reads files from Pod A (same pod!) ✅
+  Step 4 (build) → Reads Dockerfile from Pod A (same pod!) ✅
 ```
 
 All steps share the same pod's filesystem!
@@ -73,27 +74,27 @@ In the Tekton UI:
 
 ```
 lab-pipeline-run-xxxxx
-  ├─ ✅ ci (shows 3 steps inside)
+  ├─ ✅ ci-and-build (shows 4 steps inside)
   │   ├─ git-clone
   │   ├─ eslint  
-  │   └─ jest-test
-  ├─ ⏳ build-image
+  │   ├─ jest-test
+  │   └─ build-and-push
   └─ ⏳ deploy
 ```
 
-You'll see **3 tasks** instead of 6, but the CI task will show 3 internal steps.
+You'll see **2 tasks** instead of 6, but the ci-and-build task will show 4 internal steps.
 
 ## Files Created
 
-1. **`.tekton/ci-all-in-one.yml`** - Combined CI task
+1. **`.tekton/ci-all-in-one.yml`** - Combined CI + Build task
    - Step 1: Clone repository
    - Step 2: Run ESLint
    - Step 3: Run Jest tests
+   - Step 4: Build and push Docker image (buildah)
 
 2. **`pipeline-no-pvc.yml`** - Pipeline that uses the combined task
-   - Task 1: ci (all-in-one)
-   - Task 2: build-image
-   - Task 3: deploy
+   - Task 1: ci-and-build (all-in-one)
+   - Task 2: deploy
 
 3. **`run-pipeline-no-pvc.sh`** - Run script (no PVC needed!)
 
@@ -114,20 +115,21 @@ You'll see **3 tasks** instead of 6, but the CI task will show 3 internal steps.
 | Approach | Visibility | PVC Required | Works in Your Env |
 |----------|-----------|--------------|-------------------|
 | 6 separate tasks | ⭐⭐⭐⭐⭐ | Yes | ❌ (no quota) |
-| 3 tasks (all-in-one) | ⭐⭐⭐ | No | ✅ Works! |
+| 2 tasks (ci+build all-in-one) | ⭐⭐⭐ | No | ✅ Works! |
 
 ## Monitoring
 
-### View the CI task logs (all 3 steps):
+### View the CI+Build task logs (all 4 steps):
 ```bash
 LATEST=$(oc get pipelinerun --sort-by=.metadata.creationTimestamp -o name | tail -1)
-oc logs ${LATEST}-ci-pod
+oc logs ${LATEST}-ci-and-build-pod
 ```
 
-You'll see output from all 3 steps:
+You'll see output from all 4 steps:
 1. Clone output
 2. ESLint output  
 3. Jest test output
+4. Buildah build and push output
 
 ### Follow the pipeline:
 ```bash
@@ -156,8 +158,7 @@ oc delete pipelinerun --field-selector=status.conditions[0].status==False
 ## Expected Result
 
 ```
-✅ ci task completes (clone → lint → test all succeed)
-✅ build-image task completes (Docker image built)
+✅ ci-and-build task completes (clone → lint → test → build all succeed)
 ✅ deploy task completes (App deployed to OpenShift)
 🎉 SUCCESS!
 ```

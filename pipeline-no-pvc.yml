@@ -18,42 +18,28 @@ spec:
       type: string
       default: "counter-app"
   tasks:
-    # Task 1: CI (clone + lint + test in ONE task - no PVC needed!)
-    - name: ci
+    # Task 1: CI + Build (clone + lint + test + build in ONE task - no PVC needed!)
+    - name: ci-and-build
       taskRef:
-        name: ci-all-in-one
+        name: ci-build-all-in-one
       params:
         - name: repo-url
           value: "$(params.repo-url)"
         - name: revision
           value: "$(params.branch)"
-      workspaces:
-        - name: source
-          workspace: shared-workspace
-
-    # Task 2: Build Image
-    - name: build-image
-      taskRef:
-        name: buildah
-        kind: ClusterTask
-      runAfter:
-        - ci
-      params:
-        - name: IMAGE
+        - name: image
           value: "$(params.build-image)"
-        - name: CONTEXT
-          value: "."
       workspaces:
         - name: source
           workspace: shared-workspace
 
-    # Task 3: Deploy
+    # Task 2: Deploy
     - name: deploy
       taskRef:
         name: openshift-client
         kind: ClusterTask
       runAfter:
-        - build-image
+        - ci-and-build
       params:
         - name: SCRIPT
           value: |
