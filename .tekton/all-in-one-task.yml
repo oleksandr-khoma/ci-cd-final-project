@@ -1,7 +1,8 @@
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: nodejs-ci-all-in-one
+  name: git-clone-repo
 spec:
   params:
     - name: repo-url
@@ -14,15 +15,14 @@ spec:
   workspaces:
     - name: source
   steps:
-    # Step 1: Clone the repository
-    - name: git-clone
+    - name: clone
       image: alpine/git:latest
       workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "Step 1: Cloning Repository"
+        echo "Cloning Repository"
         echo "=========================================="
         echo "Repository: $(params.repo-url)"
         echo "Revision: $(params.revision)"
@@ -38,15 +38,23 @@ spec:
         ls -la
         echo ""
 
-    # Step 2: Install dependencies and run lint
-    - name: lint
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: npm-lint
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: install-and-lint
       image: node:20-alpine
       workingDir: $(workspaces.source.path)/repo
       script: |
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "Step 2: Installing Dependencies & Linting"
+        echo "Installing Dependencies & Linting"
         echo "=========================================="
         echo "Current directory: $(pwd)"
         echo ""
@@ -66,7 +74,15 @@ spec:
         echo "✅ Linting passed!"
         echo ""
 
-    # Step 3: Run tests
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: npm-test
+spec:
+  workspaces:
+    - name: source
+  steps:
     - name: test
       image: node:20-alpine
       workingDir: $(workspaces.source.path)/repo
@@ -74,7 +90,7 @@ spec:
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "Step 3: Running Tests"
+        echo "Running Tests"
         echo "=========================================="
         
         echo "🧪 Running Jest tests..."

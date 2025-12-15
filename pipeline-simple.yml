@@ -18,10 +18,10 @@ spec:
       type: string
       default: "counter-app"
   tasks:
-    # Single task that does clone + lint + test
-    - name: ci-checks
+    # Task 1: Clone repository
+    - name: clone
       taskRef:
-        name: nodejs-ci-all-in-one
+        name: git-clone-repo
       params:
         - name: repo-url
           value: "$(params.repo-url)"
@@ -31,13 +31,33 @@ spec:
         - name: source
           workspace: shared-workspace
 
-    # Build Image
+    # Task 2: Lint
+    - name: lint
+      taskRef:
+        name: npm-lint
+      runAfter:
+        - clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Task 3: Test
+    - name: test
+      taskRef:
+        name: npm-test
+      runAfter:
+        - lint
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Task 4: Build Image
     - name: build-image
       taskRef:
         name: buildah
         kind: ClusterTask
       runAfter:
-        - ci-checks
+        - test
       params:
         - name: IMAGE
           value: "$(params.build-image)"
@@ -45,7 +65,7 @@ spec:
         - name: source
           workspace: shared-workspace
 
-    # Deploy
+    # Task 5: Deploy
     - name: deploy
       taskRef:
         name: openshift-client

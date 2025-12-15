@@ -1,13 +1,14 @@
 #!/bin/bash
-# Run the simplified all-in-one pipeline (bypasses emptyDir issue)
+# Run the simplified 3-task pipeline (bypasses emptyDir issue)
 
 set -e
 
 echo "=========================================="
 echo "🚀 Simplified Pipeline Runner"
 echo "=========================================="
-echo "This uses a single task for clone+lint+test"
-echo "to bypass the emptyDir persistence issue"
+echo "This uses 3 tasks (clone, lint, test) that"
+echo "share the same workspace to bypass the"
+echo "emptyDir persistence issue"
 echo "=========================================="
 echo ""
 
@@ -28,8 +29,8 @@ REPO_URL="https://github.com/oleksandr-khoma/ci-cd-final-project.git"
 echo "✅ Repository URL: $REPO_URL"
 echo ""
 
-# Apply the all-in-one task
-echo "📦 Applying all-in-one task..."
+# Apply the 3 tasks
+echo "📦 Applying 3 tasks (clone, lint, test)..."
 oc apply -f .tekton/all-in-one-task.yml
 
 # Apply the simplified pipeline
@@ -68,8 +69,13 @@ echo "=========================================="
 echo "✅ Simplified pipeline started!"
 echo "=========================================="
 echo ""
-echo "This pipeline combines clone+lint+test into ONE task,"
-echo "so all files stay in the same pod workspace."
+echo "This pipeline uses 3 separate tasks (clone, lint, test)"
+echo "that share the same workspace for better visibility."
+echo ""
+echo "You'll see 3 separate task executions in the UI/logs:"
+echo "  1. clone (git-clone-repo)"
+echo "  2. lint (npm-lint)"
+echo "  3. test (npm-test)"
 echo ""
 echo "To view pipeline runs:"
 echo "  oc get pipelinerun"

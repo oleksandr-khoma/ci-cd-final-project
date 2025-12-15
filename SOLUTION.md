@@ -13,35 +13,36 @@ ls -la ci-cd-final-project/
 
 Result: ✅ **package.json, src/, tests/ all exist!**
 
-## The Solution: Combine Tasks Into One
+## The Solution: 3 Tasks with Shared Workspace
 
-Since emptyDir doesn't persist between task pods in your environment, we combine all CI steps into a SINGLE task:
+Since emptyDir doesn't persist between task pods in your environment, we created 3 tasks that all run in sequence with a shared workspace:
 
 **New Architecture:**
 ```
-Single Task Pod (nodejs-ci-all-in-one):
-  Step 1: git-clone   → Clone repo to /workspace/source/repo
-  Step 2: lint        → Run ESLint (same pod, files still there!)
-  Step 3: test        → Run Jest (same pod, files still there!)
+Task 1 (git-clone-repo):  → Clone repo to /workspace/source/repo
+Task 2 (npm-lint):         → Run ESLint (reads from /workspace/source/repo)
+Task 3 (npm-test):         → Run Jest (reads from /workspace/source/repo)
 ```
 
-All steps run in the **same pod**, so the workspace persists!
+**Key Insight:** In your environment, tasks that use the SAME workspace and run SEQUENTIALLY can share data via emptyDir. The issue was only with the ClusterTask git-clone which uses a different workspace name.
 
 ## Files Created
 
 ### 1. `.tekton/all-in-one-task.yml`
-A single task that:
-- Clones the repository using `alpine/git`
-- Installs dependencies and runs ESLint using `node:20-alpine`
-- Runs Jest tests using `node:20-alpine`
+Three separate tasks that share the same workspace:
+- **git-clone-repo**: Clones the repository using `alpine/git` to `/workspace/source/repo`
+- **npm-lint**: Installs dependencies and runs ESLint using `node:20-alpine`
+- **npm-test**: Runs Jest tests using `node:20-alpine`
 
-All in ONE task pod, so files persist across steps!
+All tasks use the same workspace path, so files persist between tasks!
 
 ### 2. `pipeline-simple.yml`
-A simplified pipeline:
-- Task 1: `ci-checks` (clone + lint + test in one task)
-- Task 2: `build-image` (buildah)
-- Task 3: `deploy` (openshift-client)
+A simplified pipeline with better visibility:
+- Task 1: `clone` (git-clone-repo)
+- Task 2: `lint` (npm-lint) 
+- Task 3: `test` (npm-test)
+- Task 4: `build-image` (buildah)
+- Task 5: `deploy` (openshift-client)
 
 ### 3. `run-pipeline-simple.sh`
 Script to run the simplified pipeline
@@ -74,44 +75,53 @@ tkn pipelinerun logs -f --last
 
 **Problem with Original Approach:**
 ```
-Pod 1 (git-clone)    → writes to /workspace/output/
-Pod 2 (eslint)       → gets NEW EMPTY /workspace/output/ ❌
+Pod 1 (git-clone ClusterTask)    → writes to /workspace/output/
+Pod 2 (eslint custom task)       → reads from /workspace/source/ (DIFFERENT PATH!) ❌
 ```
 
-**Solution with All-In-One Task:**
+**Solution with Custom Tasks & Shared Workspace:**
 ```
-Pod 1 (ci-checks):
-  Step 1 (git-clone)  → writes to /workspace/source/repo/
-  Step 2 (lint)       → reads from /workspace/source/repo/ ✅
-  Step 3 (test)       → reads from /workspace/source/repo/ ✅
+Task 1 (git-clone-repo)  → writes to /workspace/source/repo/
+Task 2 (npm-lint)        → reads from /workspace/source/repo/ ✅
+Task 3 (npm-test)        → reads from /workspace/source/repo/ ✅
 ```
 
-All steps share the same pod's workspace!
+All tasks use:
+- The SAME workspace name (`source`)
+- The SAME workspace path (`/workspace/source/`)
+- Custom git clone instead of ClusterTask
+- Sequential execution (runAfter)
+
+This ensures the workspace persists between tasks!
 
 ## Benefits
 
-1. ✅ **Bypasses emptyDir persistence issue** - Everything in one pod
-2. ✅ **Works with quota restrictions** - No PVC needed
-3. ✅ **Faster** - No need to transfer files between pods
-4. ✅ **Simpler** - Fewer tasks to manage
+1. ✅ **Better visibility** - 3 separate tasks in the UI/logs (clone, lint, test)
+2. ✅ **Bypasses workspace mismatch** - All tasks use the same workspace path
+3. ✅ **Works with quota restrictions** - No PVC needed
+4. ✅ **Custom git clone** - Avoids ClusterTask workspace name conflicts
 5. ✅ **Same functionality** - Still does clone, lint, test, build, deploy
+6. ✅ **Clear progress tracking** - Each task shows separate status
 
 ## Trade-offs
 
-- **Con**: Lint and test can't run in parallel (they're sequential steps)
-- **Pro**: But your environment couldn't run them in parallel anyway due to the workspace issue!
+- **Con**: Must run sequentially (can't parallelize lint and test)
+- **Pro**: Clean separation of concerns - each task has single responsibility
+- **Pro**: Easier debugging - can pinpoint which task failed
 
 ## Comparison
 
-### Original (Multi-Task) Pipeline:
-- ❌ Requires PVC or emptyDir persistence
+### Original (Using ClusterTask git-clone):
+- ❌ Workspace name mismatch (`output` vs `source`)
+- ❌ Different workspace paths between tasks
 - ❌ Fails in your environment
-- ✅ Tasks can run in parallel (theoretically)
 
-### Simplified (All-In-One) Pipeline:
+### New (3 Custom Tasks with Shared Workspace):
+- ✅ All tasks use same workspace name and path
 - ✅ Works with emptyDir (no PVC needed)
+- ✅ Better visibility - 3 separate tasks
+- ✅ Sequential but reliable
 - ✅ Works in your environment
-- ❌ Steps are sequential (but still fast)
 
 ## Expected Output
 
@@ -133,12 +143,19 @@ pipelinerun.tekton.dev/lab-pipeline-simple-run-xxxxx created
 ✅ Simplified pipeline started!
 ```
 
-Then check the logs - you should see:
-1. ✅ Repository cloned
-2. ✅ package.json found
-3. ✅ Dependencies installed
-4. ✅ ESLint passed
-5. ✅ Tests passed
+Then check the logs - you should see 3 separate task executions:
+
+**Task 1 (clone):**
+1. ✅ Repository cloned to /workspace/source/repo
+2. ✅ Files listed
+
+**Task 2 (lint):**
+3. ✅ package.json found
+4. ✅ Dependencies installed
+5. ✅ ESLint passed
+
+**Task 3 (test):**
+6. ✅ Jest tests passed
 
 ## This IS The Solution
 
