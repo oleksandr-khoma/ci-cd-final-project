@@ -4,14 +4,14 @@ metadata:
   name: cleanup
 spec:
   workspaces:
-    - name: source
+    - name: output
   steps:
     - name: remove
       image: alpine:3
       env:
         - name: WORKSPACE_SOURCE_PATH
-          value: $(workspaces.source.path)
-      workingDir: $(workspaces.source.path)
+          value: $(workspaces.output.path)
+      workingDir: $(workspaces.output.path)
       securityContext:
         runAsNonRoot: false
         runAsUser: 0
@@ -39,7 +39,7 @@ metadata:
   name: eslint
 spec:
   workspaces:
-    - name: source
+    - name: output
   params:
     - name: args
       description: Arguments to pass to ESLint
@@ -48,7 +48,7 @@ spec:
   steps:
     - name: lint
       image: node:20-alpine
-      workingDir: $(workspaces.source.path)
+      workingDir: $(workspaces.output.path)
       script: |
         #!/bin/sh
         set -e
@@ -56,16 +56,16 @@ spec:
         echo "DEBUG: Workspace Information"
         echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace path: $(workspaces.source.path)"
+        echo "Workspace path: $(workspaces.output.path)"
         echo ""
         echo "Files in current directory:"
         ls -la
         echo ""
         echo "Searching for package.json in workspace..."
-        find $(workspaces.source.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
+        find $(workspaces.output.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
         echo ""
         echo "Searching for .git directory..."
-        find $(workspaces.source.path) -maxdepth 3 -name ".git" -type d 2>/dev/null || echo "No .git found"
+        find $(workspaces.output.path) -maxdepth 3 -name ".git" -type d 2>/dev/null || echo "No .git found"
         echo "=========================================="
         echo ""
         
@@ -110,7 +110,7 @@ metadata:
   name: jest-test
 spec:
   workspaces:
-    - name: source
+    - name: output
   params:
     - name: args
       description: Arguments to pass to jest
@@ -119,7 +119,7 @@ spec:
   steps:
     - name: jest
       image: node:20-alpine
-      workingDir: $(workspaces.source.path)
+      workingDir: $(workspaces.output.path)
       script: |
         #!/bin/sh
         set -e
@@ -127,20 +127,20 @@ spec:
         echo "DEBUG: Workspace Information"
         echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace path: $(workspaces.source.path)"
+        echo "Workspace path: $(workspaces.output.path)"
         echo ""
         echo "Files in current directory:"
         ls -la
         echo ""
         echo "Searching for package.json in workspace..."
-        find $(workspaces.source.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
+        find $(workspaces.output.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
         echo "=========================================="
         echo ""
         
         # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
           # Try to find it in subdirectories
-          PACKAGE_JSON=$(find $(workspaces.source.path) -maxdepth 2 -name "package.json" -type f | head -1)
+          PACKAGE_JSON=$(find $(workspaces.output.path) -maxdepth 2 -name "package.json" -type f | head -1)
           if [ -n "$PACKAGE_JSON" ]; then
             REPO_DIR=$(dirname "$PACKAGE_JSON")
             echo "✅ Found package.json in: $REPO_DIR"

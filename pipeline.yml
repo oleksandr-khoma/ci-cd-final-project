@@ -23,7 +23,7 @@ spec:
       taskRef:
         name: cleanup
       workspaces:
-        - name: source
+        - name: output
           workspace: output
 
     # 2. Git Clone
@@ -53,7 +53,7 @@ spec:
       runAfter:
         - git-clone
       workspaces:
-        - name: source
+        - name: output
           workspace: output
 
     # 4. Tests
@@ -63,7 +63,7 @@ spec:
       runAfter:
         - lint
       workspaces:
-        - name: source
+        - name: output
           workspace: output
 
     # 5. Build Image
