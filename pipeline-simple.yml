@@ -61,6 +61,8 @@ spec:
       params:
         - name: IMAGE
           value: "$(params.build-image)"
+        - name: CONTEXT
+          value: "repo"
       workspaces:
         - name: source
           workspace: shared-workspace

@@ -1,27 +1,24 @@
-FROM node:18-alpine
+# Use Node.js LTS version
+FROM node:20-alpine
 
-# Set working directory
+# Create app directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install production dependencies
 RUN npm ci --only=production
 
-# Copy source code
-COPY src/ ./src/
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S service -u 1001 -G nodejs && \
-    chown -R service:nodejs /app
-
-USER service
+# Copy application source
+COPY src ./src
 
 # Expose port
-ENV PORT=8000
-EXPOSE $PORT
+EXPOSE 3000
 
-# Start application
-CMD ["npm", "start"]
+# Set environment to production
+ENV NODE_ENV=production
+
+# Run the application
+CMD ["node", "src/app.js"]
+
