@@ -1,36 +1,73 @@
+---
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: cleanup
 spec:
   workspaces:
-    - name: output
+    - name: source
   steps:
     - name: remove
       image: alpine:3
-      env:
-        - name: WORKSPACE_SOURCE_PATH
-          value: $(workspaces.output.path)
-      workingDir: $(workspaces.output.path)
-      securityContext:
-        runAsNonRoot: false
-        runAsUser: 0
+      workingDir: $(workspaces.source.path)
       script: |
-        #!/usr/bin/env sh
+        #!/bin/sh
         set -eu
-        echo "Removing all files from ${WORKSPACE_SOURCE_PATH} ..."
-        # Delete any existing contents of the directory if it exists.
-        #
-        # We don't just "rm -rf ${WORKSPACE_SOURCE_PATH}" because ${WORKSPACE_SOURCE_PATH} might be "/"
-        # or the root of a mounted volume.
-        if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
-          # Delete non-hidden files and directories
-          rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
-          # Delete files and directories starting with . but excluding ..
-          rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
-          # Delete files and directories starting with .. plus any other character
-          rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
+        echo "=========================================="
+        echo "Cleaning Workspace"
+        echo "=========================================="
+        echo "Workspace path: $(workspaces.source.path)"
+        echo ""
+        
+        # Remove all files from workspace
+        if [ -d "$(workspaces.source.path)" ]; then
+          rm -rf $(workspaces.source.path)/* 2>/dev/null || true
+          rm -rf $(workspaces.source.path)/.[!.]* 2>/dev/null || true
+          rm -rf $(workspaces.source.path)/..?* 2>/dev/null || true
+          echo "✅ Workspace cleaned"
+        else
+          echo "✅ Workspace already empty"
         fi
+        echo ""
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Git revision (branch/tag/commit)
+      default: "main"
+  workspaces:
+    - name: source
+  steps:
+    - name: clone
+      image: alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "=========================================="
+        echo "Cloning Repository"
+        echo "=========================================="
+        echo "Repository: $(params.repo-url)"
+        echo "Revision: $(params.revision)"
+        echo ""
+        
+        # Clone directly to workspace root (not subdirectory)
+        git clone --branch $(params.revision) --depth 1 $(params.repo-url) .
+        
+        echo "✅ Repository cloned successfully"
+        echo ""
+        echo "Files in repository:"
+        ls -la
+        echo ""
 
 ---
 apiVersion: tekton.dev/v1beta1
@@ -39,7 +76,7 @@ metadata:
   name: eslint
 spec:
   workspaces:
-    - name: output
+    - name: source
   params:
     - name: args
       description: Arguments to pass to ESLint
@@ -48,60 +85,32 @@ spec:
   steps:
     - name: lint
       image: node:20-alpine
-      workingDir: $(workspaces.output.path)
+      workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "DEBUG: Workspace Information"
+        echo "ESLint - Installing Dependencies & Linting"
         echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace path: $(workspaces.output.path)"
-        echo ""
-        echo "Files in current directory:"
-        ls -la
-        echo ""
-        echo "Searching for package.json in workspace..."
-        find $(workspaces.output.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
-        echo ""
-        echo "Searching for .git directory..."
-        find $(workspaces.output.path) -maxdepth 3 -name ".git" -type d 2>/dev/null || echo "No .git found"
-        echo "=========================================="
         echo ""
         
-        # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
-          # Try to find it in subdirectories
-          PACKAGE_JSON=$(find $(workspaces.output.path) -maxdepth 2 -name "package.json" -type f | head -1)
-          if [ -n "$PACKAGE_JSON" ]; then
-            REPO_DIR=$(dirname "$PACKAGE_JSON")
-            echo "✅ Found package.json in: $REPO_DIR"
-            echo "Changing to repository directory..."
-            cd "$REPO_DIR"
-          else
-            echo "=========================================="
-            echo "ERROR: package.json not found!"
-            echo "=========================================="
-            echo "Current directory: $(pwd)"
-            echo ""
-            if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
-              echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
-              echo "⚠️  This pipeline requires a Node.js repository!"
-              echo ""
-              echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
-              echo "     that contains package.json, not a Python repository."
-            else
-              echo "The repository was cloned but doesn't contain package.json"
-              echo "Please verify the repo-url parameter points to a Node.js project."
-            fi
-            echo "=========================================="
-            exit 1
-          fi
+          echo "❌ ERROR: package.json not found!"
+          echo "Directory contents:"
+          ls -la
+          exit 1
         fi
-        echo "Installing dependencies..."
+        
+        echo "📦 Installing dependencies..."
         npm install
-        echo "Running ESLint..."
+        
+        echo ""
+        echo "🔍 Running ESLint..."
         npm run lint $(params.args)
+        
+        echo "✅ Linting passed!"
+        echo ""
 
 ---
 apiVersion: tekton.dev/v1beta1
@@ -110,64 +119,35 @@ metadata:
   name: jest-test
 spec:
   workspaces:
-    - name: output
+    - name: source
   params:
     - name: args
       description: Arguments to pass to jest
       type: string
       default: "-v"
   steps:
-    - name: jest
+    - name: test
       image: node:20-alpine
-      workingDir: $(workspaces.output.path)
+      workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "DEBUG: Workspace Information"
+        echo "Jest - Running Tests"
         echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace path: $(workspaces.output.path)"
-        echo ""
-        echo "Files in current directory:"
-        ls -la
-        echo ""
-        echo "Searching for package.json in workspace..."
-        find $(workspaces.output.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
-        echo "=========================================="
         echo ""
         
-        # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
-          # Try to find it in subdirectories
-          PACKAGE_JSON=$(find $(workspaces.output.path) -maxdepth 2 -name "package.json" -type f | head -1)
-          if [ -n "$PACKAGE_JSON" ]; then
-            REPO_DIR=$(dirname "$PACKAGE_JSON")
-            echo "✅ Found package.json in: $REPO_DIR"
-            echo "Changing to repository directory..."
-            cd "$REPO_DIR"
-          else
-            echo "=========================================="
-            echo "ERROR: package.json not found!"
-            echo "=========================================="
-            echo "Current directory: $(pwd)"
-            echo ""
-            if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
-              echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
-              echo "⚠️  This pipeline requires a Node.js repository!"
-              echo ""
-              echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
-              echo "     that contains package.json, not a Python repository."
-            else
-              echo "The repository was cloned but doesn't contain package.json"
-              echo "Please verify the repo-url parameter points to a Node.js project."
-            fi
-            echo "=========================================="
-            exit 1
-          fi
+          echo "❌ ERROR: package.json not found!"
+          echo "Directory contents:"
+          ls -la
+          exit 1
         fi
-        echo "Installing dependencies..."
-        npm install
-        echo "Running Jest tests..."
+        
+        echo "🧪 Running Jest tests..."
         npm test $(params.args)
+        
+        echo "✅ Tests passed!"
+        echo ""
 

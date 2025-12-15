@@ -1,14 +1,13 @@
 #!/bin/bash
-# Run the simplified 3-task pipeline (bypasses emptyDir issue)
+# Run the full 6-step pipeline with PVC support
 
 set -e
 
 echo "=========================================="
-echo "🚀 Simplified Pipeline Runner"
+echo "🚀 CI/CD Pipeline Runner"
 echo "=========================================="
-echo "This uses 3 tasks (clone, lint, test) that"
-echo "share the same workspace to bypass the"
-echo "emptyDir persistence issue"
+echo "Full pipeline: cleanup → git-clone → lint → test → build → deploy"
+echo "Attempts to use PVC for workspace persistence"
 echo "=========================================="
 echo ""
 
@@ -55,12 +54,12 @@ else
 fi
 echo ""
 
-# Apply the 3 tasks
-echo "📦 Applying 3 tasks (clone, lint, test)..."
-oc apply -f .tekton/all-in-one-task.yml
+# Apply the tasks
+echo "📦 Applying tasks (cleanup, git-clone, eslint, jest-test)..."
+oc apply -f .tekton/tasks.yml
 
-# Apply the simplified pipeline
-echo "📦 Applying simplified pipeline..."
+# Apply the pipeline
+echo "📦 Applying pipeline..."
 oc apply -f pipeline-simple.yml
 
 echo ""
@@ -130,13 +129,16 @@ else
   echo "⚠️  you need to request PVC quota from your administrator"
 fi
 echo ""
-echo "This pipeline uses 3 separate tasks (clone, lint, test)"
+echo "This pipeline uses the full 6-step structure:"
 echo "that share the same workspace for better visibility."
 echo ""
-echo "You'll see 3 separate task executions in the UI/logs:"
-echo "  1. clone (git-clone-repo)"
-echo "  2. lint (npm-lint)"
-echo "  3. test (npm-test)"
+echo "You'll see 6 separate task executions in the UI/logs:"
+echo "  1. cleanup"
+echo "  2. git-clone"
+echo "  3. lint (eslint)"
+echo "  4. tests (jest-test)"
+echo "  5. build-image (buildah)"
+echo "  6. deploy (openshift-client)"
 echo ""
 echo "To view pipeline runs:"
 echo "  oc get pipelinerun"

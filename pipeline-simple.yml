@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: lab-pipeline-simple
+  name: lab-pipeline
 spec:
   workspaces:
     - name: shared-workspace
@@ -18,10 +18,20 @@ spec:
       type: string
       default: "counter-app"
   tasks:
-    # Task 1: Clone repository
-    - name: clone
+    # Task 1: Cleanup
+    - name: cleanup
       taskRef:
-        name: git-clone-repo
+        name: cleanup
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Task 2: Clone repository
+    - name: git-clone
+      taskRef:
+        name: git-clone
+      runAfter:
+        - cleanup
       params:
         - name: repo-url
           value: "$(params.repo-url)"
@@ -31,43 +41,43 @@ spec:
         - name: source
           workspace: shared-workspace
 
-    # Task 2: Lint
+    # Task 3: Lint
     - name: lint
       taskRef:
-        name: npm-lint
+        name: eslint
       runAfter:
-        - clone
+        - git-clone
       workspaces:
         - name: source
           workspace: shared-workspace
 
-    # Task 3: Test
-    - name: test
+    # Task 4: Test
+    - name: tests
       taskRef:
-        name: npm-test
+        name: jest-test
       runAfter:
         - lint
       workspaces:
         - name: source
           workspace: shared-workspace
 
-    # Task 4: Build Image
+    # Task 5: Build Image
     - name: build-image
       taskRef:
         name: buildah
         kind: ClusterTask
       runAfter:
-        - test
+        - tests
       params:
         - name: IMAGE
           value: "$(params.build-image)"
         - name: CONTEXT
-          value: "repo"
+          value: "."
       workspaces:
         - name: source
           workspace: shared-workspace
 
-    # Task 5: Deploy
+    # Task 6: Deploy
     - name: deploy
       taskRef:
         name: openshift-client
