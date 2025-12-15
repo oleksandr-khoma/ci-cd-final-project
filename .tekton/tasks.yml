@@ -52,27 +52,51 @@ spec:
       script: |
         #!/bin/sh
         set -e
+        echo "=========================================="
+        echo "DEBUG: Workspace Information"
+        echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace contents:"
+        echo "Workspace path: $(workspaces.source.path)"
+        echo ""
+        echo "Files in current directory:"
         ls -la
+        echo ""
+        echo "Searching for package.json in workspace..."
+        find $(workspaces.source.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
+        echo ""
+        echo "Searching for .git directory..."
+        find $(workspaces.source.path) -maxdepth 3 -name ".git" -type d 2>/dev/null || echo "No .git found"
+        echo "=========================================="
+        echo ""
+        
+        # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
-          echo "=========================================="
-          echo "ERROR: package.json not found!"
-          echo "=========================================="
-          echo "Current directory: $(pwd)"
-          echo ""
-          if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
-            echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
-            echo "⚠️  This pipeline requires a Node.js repository!"
-            echo ""
-            echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
-            echo "     that contains package.json, not a Python repository."
+          # Try to find it in subdirectories
+          PACKAGE_JSON=$(find $(workspaces.source.path) -maxdepth 2 -name "package.json" -type f | head -1)
+          if [ -n "$PACKAGE_JSON" ]; then
+            REPO_DIR=$(dirname "$PACKAGE_JSON")
+            echo "✅ Found package.json in: $REPO_DIR"
+            echo "Changing to repository directory..."
+            cd "$REPO_DIR"
           else
-            echo "The repository was cloned but doesn't contain package.json"
-            echo "Please verify the repo-url parameter points to a Node.js project."
+            echo "=========================================="
+            echo "ERROR: package.json not found!"
+            echo "=========================================="
+            echo "Current directory: $(pwd)"
+            echo ""
+            if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
+              echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
+              echo "⚠️  This pipeline requires a Node.js repository!"
+              echo ""
+              echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
+              echo "     that contains package.json, not a Python repository."
+            else
+              echo "The repository was cloned but doesn't contain package.json"
+              echo "Please verify the repo-url parameter points to a Node.js project."
+            fi
+            echo "=========================================="
+            exit 1
           fi
-          echo "=========================================="
-          exit 1
         fi
         echo "Installing dependencies..."
         npm install
@@ -99,27 +123,48 @@ spec:
       script: |
         #!/bin/sh
         set -e
+        echo "=========================================="
+        echo "DEBUG: Workspace Information"
+        echo "=========================================="
         echo "Current directory: $(pwd)"
-        echo "Workspace contents:"
+        echo "Workspace path: $(workspaces.source.path)"
+        echo ""
+        echo "Files in current directory:"
         ls -la
+        echo ""
+        echo "Searching for package.json in workspace..."
+        find $(workspaces.source.path) -maxdepth 3 -name "package.json" -type f 2>/dev/null || echo "No package.json found"
+        echo "=========================================="
+        echo ""
+        
+        # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
-          echo "=========================================="
-          echo "ERROR: package.json not found!"
-          echo "=========================================="
-          echo "Current directory: $(pwd)"
-          echo ""
-          if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
-            echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
-            echo "⚠️  This pipeline requires a Node.js repository!"
-            echo ""
-            echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
-            echo "     that contains package.json, not a Python repository."
+          # Try to find it in subdirectories
+          PACKAGE_JSON=$(find $(workspaces.source.path) -maxdepth 2 -name "package.json" -type f | head -1)
+          if [ -n "$PACKAGE_JSON" ]; then
+            REPO_DIR=$(dirname "$PACKAGE_JSON")
+            echo "✅ Found package.json in: $REPO_DIR"
+            echo "Changing to repository directory..."
+            cd "$REPO_DIR"
           else
-            echo "The repository was cloned but doesn't contain package.json"
-            echo "Please verify the repo-url parameter points to a Node.js project."
+            echo "=========================================="
+            echo "ERROR: package.json not found!"
+            echo "=========================================="
+            echo "Current directory: $(pwd)"
+            echo ""
+            if [ -f "setup.cfg" ] || [ -f "requirements.txt" ]; then
+              echo "⚠️  FOUND PYTHON PROJECT FILES (setup.cfg, requirements.txt)"
+              echo "⚠️  This pipeline requires a Node.js repository!"
+              echo ""
+              echo "FIX: Update the 'repo-url' parameter to point to your Node.js repository"
+              echo "     that contains package.json, not a Python repository."
+            else
+              echo "The repository was cloned but doesn't contain package.json"
+              echo "Please verify the repo-url parameter points to a Node.js project."
+            fi
+            echo "=========================================="
+            exit 1
           fi
-          echo "=========================================="
-          exit 1
         fi
         echo "Installing dependencies..."
         npm install

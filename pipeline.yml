@@ -38,6 +38,10 @@ spec:
           value: "$(params.repo-url)"
         - name: revision
           value: "$(params.branch)"
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
       workspaces:
         - name: output
           workspace: output
