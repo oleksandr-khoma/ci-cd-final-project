@@ -1,0 +1,82 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: ci-all-in-one
+spec:
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Git revision (branch/tag/commit)
+      default: "main"
+  workspaces:
+    - name: source
+  steps:
+    # Step 1: Clone
+    - name: git-clone
+      image: alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "=========================================="
+        echo "Step 1: Cloning Repository"
+        echo "=========================================="
+        echo "Repository: $(params.repo-url)"
+        echo "Revision: $(params.revision)"
+        echo ""
+        
+        git clone --branch $(params.revision) --depth 1 $(params.repo-url) .
+        
+        echo "✅ Repository cloned successfully"
+        echo ""
+        echo "Files in repository:"
+        ls -la
+        echo ""
+
+    # Step 2: Lint
+    - name: eslint
+      image: node:20-alpine
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "=========================================="
+        echo "Step 2: ESLint - Linting Code"
+        echo "=========================================="
+        
+        if [ ! -f "package.json" ]; then
+          echo "❌ ERROR: package.json not found!"
+          exit 1
+        fi
+        
+        echo "📦 Installing dependencies..."
+        npm install
+        
+        echo ""
+        echo "🔍 Running ESLint..."
+        npm run lint
+        
+        echo "✅ Linting passed!"
+        echo ""
+
+    # Step 3: Test
+    - name: jest-test
+      image: node:20-alpine
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/sh
+        set -e
+        echo "=========================================="
+        echo "Step 3: Jest - Running Tests"
+        echo "=========================================="
+        
+        echo "🧪 Running Jest tests..."
+        npm test
+        
+        echo "✅ Tests passed!"
+        echo ""
+

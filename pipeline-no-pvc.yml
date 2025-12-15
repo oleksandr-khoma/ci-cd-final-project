@@ -1,0 +1,61 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: lab-pipeline-no-pvc
+spec:
+  workspaces:
+    - name: shared-workspace
+  params:
+    - name: repo-url
+      type: string
+      description: "The URL of the repository to clone"
+    - name: branch
+      type: string
+      default: "main"
+    - name: build-image
+      type: string
+    - name: app-name
+      type: string
+      default: "counter-app"
+  tasks:
+    # Task 1: CI (clone + lint + test in ONE task - no PVC needed!)
+    - name: ci
+      taskRef:
+        name: ci-all-in-one
+      params:
+        - name: repo-url
+          value: "$(params.repo-url)"
+        - name: revision
+          value: "$(params.branch)"
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Task 2: Build Image
+    - name: build-image
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      runAfter:
+        - ci
+      params:
+        - name: IMAGE
+          value: "$(params.build-image)"
+        - name: CONTEXT
+          value: "."
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    # Task 3: Deploy
+    - name: deploy
+      taskRef:
+        name: openshift-client
+        kind: ClusterTask
+      runAfter:
+        - build-image
+      params:
+        - name: SCRIPT
+          value: |
+            oc create deployment $(params.app-name) --image=$(params.build-image) --dry-run=client -o yaml | oc apply -f -
+
