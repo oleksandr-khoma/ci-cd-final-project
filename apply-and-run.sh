@@ -4,11 +4,15 @@
 set -e
 
 echo "=========================================="
-echo "🔧 Applying Workspace Fix"
+echo "🔧 Pulling Latest Changes & Applying Fixes"
 echo "=========================================="
 echo ""
 
-# Apply the fixed tasks
+# Pull latest changes from git
+echo "📥 Pulling latest changes from GitHub..."
+git pull origin main
+
+echo ""
 echo "📦 Applying updated tasks..."
 oc apply -f .tekton/tasks.yml
 
