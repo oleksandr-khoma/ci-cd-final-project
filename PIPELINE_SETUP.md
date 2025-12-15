@@ -41,13 +41,7 @@ spec:
       value: "counter-app"
   workspaces:
     - name: output
-      volumeClaimTemplate:
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
+      emptyDir: {}
 EOF
 ```
 
