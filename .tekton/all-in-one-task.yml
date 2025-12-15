@@ -49,18 +49,42 @@ spec:
   steps:
     - name: install-and-lint
       image: node:20-alpine
-      workingDir: $(workspaces.source.path)/repo
+      workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
         echo "=========================================="
-        echo "Installing Dependencies & Linting"
+        echo "DEBUG: Workspace Investigation"
         echo "=========================================="
+        echo "Workspace path: $(workspaces.source.path)"
         echo "Current directory: $(pwd)"
         echo ""
+        echo "Contents of /workspace/source:"
+        ls -la /workspace/source/ || echo "Directory doesn't exist!"
+        echo ""
+        echo "Looking for repo directory:"
+        ls -la /workspace/source/repo/ 2>/dev/null || echo "repo/ directory doesn't exist!"
+        echo ""
+        echo "=========================================="
+        echo "Installing Dependencies & Linting"
+        echo "=========================================="
         
+        # Try to find the repo directory
+        if [ -d "repo" ]; then
+          cd repo
+          echo "✅ Changed to repo directory: $(pwd)"
+        else
+          echo "❌ ERROR: repo directory not found!"
+          echo "Available directories in workspace:"
+          ls -la
+          exit 1
+        fi
+        
+        echo ""
         if [ ! -f "package.json" ]; then
-          echo "❌ ERROR: package.json not found!"
+          echo "❌ ERROR: package.json not found in $(pwd)!"
+          echo "Directory contents:"
+          ls -la
           exit 1
         fi
         
@@ -85,7 +109,7 @@ spec:
   steps:
     - name: test
       image: node:20-alpine
-      workingDir: $(workspaces.source.path)/repo
+      workingDir: $(workspaces.source.path)
       script: |
         #!/bin/sh
         set -e
@@ -93,6 +117,18 @@ spec:
         echo "Running Tests"
         echo "=========================================="
         
+        # Navigate to repo directory
+        if [ -d "repo" ]; then
+          cd repo
+          echo "✅ Changed to repo directory: $(pwd)"
+        else
+          echo "❌ ERROR: repo directory not found!"
+          echo "Available in workspace:"
+          ls -la
+          exit 1
+        fi
+        
+        echo ""
         echo "🧪 Running Jest tests..."
         npm test
         
