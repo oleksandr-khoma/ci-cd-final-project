@@ -24,12 +24,12 @@ spec:
         # We don't just "rm -rf ${WORKSPACE_SOURCE_PATH}" because ${WORKSPACE_SOURCE_PATH} might be "/"
         # or the root of a mounted volume.
         if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
-        # Delete non-hidden files and directories
-        rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
-        # Delete files and directories starting with . but excluding ..
-        rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
-        # Delete files and directories starting with .. plus any other character
-        rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
+          # Delete non-hidden files and directories
+          rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
+          # Delete files and directories starting with . but excluding ..
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
+          # Delete files and directories starting with .. plus any other character
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
         fi
 
 ---
@@ -72,7 +72,7 @@ spec:
         # Check if package.json exists in current directory
         if [ ! -f "package.json" ]; then
           # Try to find it in subdirectories
-          PACKAGE_JSON=$(find $(workspaces.source.path) -maxdepth 2 -name "package.json" -type f | head -1)
+          PACKAGE_JSON=$(find $(workspaces.output.path) -maxdepth 2 -name "package.json" -type f | head -1)
           if [ -n "$PACKAGE_JSON" ]; then
             REPO_DIR=$(dirname "$PACKAGE_JSON")
             echo "✅ Found package.json in: $REPO_DIR"
