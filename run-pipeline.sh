@@ -56,7 +56,8 @@ spec:
       value: "counter-app"
   workspaces:
     - name: output
-      emptyDir: {}
+      persistentVolumeClaim:
+        claimName: pipeline-workspace-pvc
 EOF
 
 echo ""
