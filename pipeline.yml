@@ -8,8 +8,7 @@ spec:
   params:
     - name: repo-url
       type: string
-      description: "The URL of the repository to clone. MUST be your Node.js repo, not the default Python one."
-      default: "https://github.com/ibm-developer-skills-network/wtecc-CICD_PracticeCode"
+      description: "The URL of the repository to clone. MUST be your Node.js repo with package.json"
     - name: branch
       type: string
       default: "main"
