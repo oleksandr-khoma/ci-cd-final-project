@@ -7,12 +7,34 @@ Current directory: /workspace/source
 The repository was cloned but doesn't contain package.json
 ```
 
+The workspace at `/workspace/source` was completely empty, even though git-clone succeeded.
+
 ## Root Cause
-The Tekton `git-clone` ClusterTask was cloning the repository, but there was a workspace path mismatch or the repository was being cloned into an unexpected subdirectory.
+**WORKSPACE NAME MISMATCH!**
+
+The `git-clone` ClusterTask uses a workspace named `output` which mounts at `/workspace/output/`.
+However, the custom tasks (`cleanup`, `eslint`, `jest-test`) were using workspace name `source` which mounts at `/workspace/source/`.
+
+Even though the pipeline was mapping everything to the same workspace, Tekton creates mount points based on the **task's workspace name**, not the pipeline workspace name.
+
+Result:
+- git-clone cloned to `/workspace/output/` ✅
+- eslint/jest-test looked in `/workspace/source/` ❌ (empty)
 
 ## Solutions Implemented
 
-### 1. Added Git Clone Parameters
+### 1. Fixed Workspace Names (THE CRITICAL FIX)
+Changed all custom tasks to use workspace name `output` instead of `source`:
+- `cleanup` task: `source` → `output`
+- `eslint` task: `source` → `output`  
+- `jest-test` task: `source` → `output`
+
+Updated all workspace references:
+- `$(workspaces.source.path)` → `$(workspaces.output.path)`
+
+Updated `pipeline.yml` workspace mappings to match.
+
+### 2. Added Git Clone Parameters
 Updated `pipeline.yml` to include:
 ```yaml
 - name: subdirectory
@@ -74,6 +96,18 @@ The enhanced error messages will guide you to the exact issue.
 - ✅ `pipeline.yml` - Added git-clone parameters
 - ✅ All changes committed and pushed to GitHub
 
+## Verification
+After fixing the workspace names, the git-clone logs show:
+```
+Successfully cloned https://github.com/oleksandr-khoma/ci-cd-final-project.git @ d4d300d... in path /workspace/output/
+```
+
+Now all tasks look in `/workspace/output/` where the files actually are!
+
 ## Next Steps
-Run the pipeline again and check the detailed debug output. The tasks will now automatically find and change to the directory containing `package.json` if it exists anywhere in the workspace.
+1. Apply the updated tasks: `oc apply -f .tekton/tasks.yml`
+2. Apply the updated pipeline: `oc apply -f pipeline.yml`
+3. Run the pipeline: `./run-pipeline.sh`
+
+The tasks will now find `package.json` because they're looking in the correct workspace directory!
 
